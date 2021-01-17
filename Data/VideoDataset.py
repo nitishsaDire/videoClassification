@@ -5,6 +5,7 @@ from torchvision import transforms
 import os
 from PIL import Image
 import re
+import torch
 
 class VideoDataset(Dataset):
     def __init__(self, video_path, destination_path, extensions):
@@ -35,12 +36,12 @@ class VideoDataset(Dataset):
                 image = Image.open(path + name).convert('RGB')
                 image = transform(image)
                 images.append((image))
-        return images
+        return  torch.stack(images[:30], dim=0)
 
     def __getitem__(self, index):
         frames_path = self.frames[index].get_frames_path()
         images, label = self.get_images(frames_path), self.get_label(frames_path)
-        return (images, label)
+        return images,label
 
     def __len__(self):
         return len(self.videoFilesPaths)
