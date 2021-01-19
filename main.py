@@ -19,7 +19,7 @@ def main():
 
     dataset_sizes = {x: len(videoDatasetDict[x]) for x in ['train', 'val']}
 
-    dataloader = {x: DataLoader(videoDatasetDict[x], batch_size=1,
+    dataloader = {x: DataLoader(videoDatasetDict[x], batch_size=2,
                             shuffle=True, num_workers=0) for x in ['train', 'val']}
     # print(dataloader.batch_size)
 
@@ -28,9 +28,13 @@ def main():
     criterion = nn.CrossEntropyLoss()
     ConvoLSTM = [CNNModel(),decoderLSTM()]
 
-    optimizer = torch.optim.SGD(list(decoderLSTM().parameters()), lr=0.001, momentum=0.9)
+    use_cuda = torch.cuda.is_available()  # check if GPU exists
+    device = torch.device("cuda" if use_cuda else "cpu")  # use CPU or GPU
+    print(device)
+
+    optimizer = torch.optim.SGD(list(decoderLSTM().parameters()) + list(CNNModel().parameters()), lr=0.001, momentum=0.9)
     exp_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-    train_model(ConvoLSTM, criterion, optimizer, exp_lr_scheduler, dataloader, dataset_sizes)
+    train_model(ConvoLSTM, criterion, optimizer, exp_lr_scheduler, dataloader, dataset_sizes, device)
 
 
 class decoderLSTM(nn.Module):
@@ -91,7 +95,7 @@ class CNNModel(nn.Module):
 
 
 
-def train_model(model, criterion, optimizer, scheduler, dataloader, dataset_sizes, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, dataloader, dataset_sizes, device, num_epochs=25):
     since = time.time()
     cnn,lstm = model
     PATH = ''
@@ -118,8 +122,8 @@ def train_model(model, criterion, optimizer, scheduler, dataloader, dataset_size
             for inputs, labels in dataloader[phase]:
             # for inputs, labels in dataloader:
 
-                # inputs = inputs.to(device)
-                # labels = labels.to(device)
+                inputs = inputs.to(device)
+                labels = labels.to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
