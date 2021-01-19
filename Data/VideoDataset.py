@@ -6,6 +6,7 @@ import os
 from PIL import Image
 import re
 import torch
+from sklearn import preprocessing
 
 class VideoDataset(Dataset):
     def __init__(self, video_path, destination_path, extensions):
@@ -16,6 +17,9 @@ class VideoDataset(Dataset):
         self.videoFilesPaths = videoFiles.get_files_paths()
         self.n = len(self.videoFilesPaths)
         self.frames=[]
+        self.le = preprocessing.LabelEncoder()
+        self.le.fit(["GolfSwing","Swing","TennisSwing","YoYo"])
+
         for idx, video in enumerate(self.videoFilesPaths):
             self.frames.append(Frames(video, self.destination_path))
             self.frames[-1].generate_frames()
@@ -23,13 +27,13 @@ class VideoDataset(Dataset):
     def get_label(self, frame_path):
         '''Assuming video has label name in its name'''
         m = re.search("v_(.*)_g", frame_path)
-        return m.group(1)
+        return self.le.transform(list(str(m.group(1)).split(" ")))[0]
 
     def get_images(self, images_path):
         images = []
         transform = transforms.Compose(
             [transforms.ToTensor(),
-             transforms.Resize((220, 220))])
+             transforms.Resize((64, 64))])
 
         for path, subdirs, files in os.walk(images_path):
             for name in files:

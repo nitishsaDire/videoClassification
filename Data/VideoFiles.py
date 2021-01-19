@@ -1,5 +1,4 @@
-import cv2
-from glob import glob
+import re
 import os
 
 class VideoFiles:
@@ -8,12 +7,14 @@ class VideoFiles:
         self.video_root_path = video_root_path
         self.extensions = extensions
 
+
     def get_files_paths(self):
-        result = []
+        videoFiles = []
         for path, subdirs, files in os.walk('/home/nitish/Downloads/ffmpeg'):
             for name in files:
                 print(path+name)
                 for e in self.extensions:
                     if name.endswith(e):
-                        result.append(path + "/" + name)
-        return  result
+                        videoFilePath = path + "/" + name
+                        videoFiles.append(videoFilePath)
+        return  videoFiles

@@ -3,10 +3,7 @@ from Data.VideoDataset import *
 import torch
 import torch.nn as nn
 import torchvision.models as models
-import torch.nn.functional as F
 import time,copy
-from sklearn.model_selection import train_test_split
-from torchsummary import summary
 
 def main():
     video_root_path ='/home/nitish/Downloads/ffmpeg/'
@@ -14,25 +11,26 @@ def main():
     destination_path = '/home/nitish/Downloads/ffmpeg/ALL_FRAMES/'
     videoDataset = VideoDataset(video_root_path, destination_path, extensions)
 
-    dataloader = DataLoader(videoDataset, batch_size=2,
-                            shuffle=True, num_workers=0)
-    print(dataloader.batch_size)
-    # dataiter = iter(dataloader)
-    # images, labels = dataiter.next()
-    # print(type(images))
-    # print(images.shape)
-    # print(labels.shape)
+    train_size = int(0.8 * len(videoDataset))
+    val_size = len(videoDataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(videoDataset, [train_size, val_size])
+
+    videoDatasetDict = {"train": train_dataset, "val":val_dataset}
+
+    dataset_sizes = {x: len(videoDatasetDict[x]) for x in ['train', 'val']}
+
+    dataloader = {x: DataLoader(videoDatasetDict[x], batch_size=1,
+                            shuffle=True, num_workers=0) for x in ['train', 'val']}
+    # print(dataloader.batch_size)
 
 
 
     criterion = nn.CrossEntropyLoss()
     ConvoLSTM = [CNNModel(),decoderLSTM()]
-    ConvoLSTM[1](torch.randn((2,10,512)))
 
-    # ConvoLSTMParams = ConvoLSTM.parameters()
     optimizer = torch.optim.SGD(list(decoderLSTM().parameters()), lr=0.001, momentum=0.9)
     exp_lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-    train_model(ConvoLSTM, criterion, optimizer, exp_lr_scheduler, dataloader)
+    train_model(ConvoLSTM, criterion, optimizer, exp_lr_scheduler, dataloader, dataset_sizes)
 
 
 class decoderLSTM(nn.Module):
@@ -43,31 +41,21 @@ class decoderLSTM(nn.Module):
         self.num_layers = 3
         self.vocab_sz = 4
         self.lstm = nn.LSTM(self.input_dim, self.hidden_size, self.num_layers)
-        self.linear = nn.Linear(self.hidden_size, self.vocab_sz)
-        # self.decoderLSTM = self.get_model()
-
-    # def get_model(self):
-    #     return nn.Sequential(
-    #         self.lstm,
-    #         ,
-    #         nn.ReLU(),
-    #         nn.Softmax()
-    #     )
+        self.sequential = nn.Sequential(
+                        nn.Linear(self.hidden_size, self.vocab_sz),
+                        nn.ReLU(),
+                        nn.Softmax())
 
     def forward(self, x):
         """
 
         :param x: shape (bs,ts,512)
-        :return: shape (bs,ts,4)
+        :return: shape (bs,vocab_sz)
         """
-        all_embeddings = []
-        # for ts in range(x.shape[1]):
-        # all_embeddings.append(self.decoderLSTM(x))
-        res,h = self.lstm(x)
-        self.linear(res)
-        return nn.Softmax(nn.ReLU(res))
 
-        # return all_embeddings
+        res,h = self.lstm(x)
+        return self.sequential(res[:,-1,:])
+
 
 class CNNModel(nn.Module):
 
@@ -95,17 +83,19 @@ class CNNModel(nn.Module):
         :param x: shape (bs, 30, 3, 220, 220)   torch.Size([4, 30, 3, 220, 220])
         :return: shape (bs, 30, 512)
         """
+
         all_embeddings = []
         for ts in range(x.shape[1]):
             all_embeddings.append(self.ConvoLSTM(x[:,ts,:,:,:]))
-        return  all_embeddings
+        return  torch.stack(all_embeddings, 1)
 
 
 
-def train_model(model, criterion, optimizer, scheduler, dataloader, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, dataloader, dataset_sizes, num_epochs=25):
     since = time.time()
     cnn,lstm = model
-    # best_model_wts = copy.deepcopy(model.state_dict())
+    PATH = ''
+    best_model_wts_cnn, best_model_wts_lstm = copy.deepcopy(cnn.state_dict()), copy.deepcopy(lstm.state_dict())
     best_acc = 0.0
 
     for epoch in range(num_epochs):
@@ -125,8 +115,8 @@ def train_model(model, criterion, optimizer, scheduler, dataloader, num_epochs=2
             running_corrects = 0
 
             # Iterate over data.
-            # for inputs, labels in dataloader[phase]:
-            for inputs, labels in dataloader:
+            for inputs, labels in dataloader[phase]:
+            # for inputs, labels in dataloader:
 
                 # inputs = inputs.to(device)
                 # labels = labels.to(device)
@@ -161,7 +151,15 @@ def train_model(model, criterion, optimizer, scheduler, dataloader, num_epochs=2
             # deep copy the model
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
-                # best_model_wts = copy.deepcopy(model.state_dict())
+                best_model_wts_cnn, best_model_wts_lstm = copy.deepcopy(cnn.state_dict()), copy.deepcopy(lstm.state_dict())
+
+        torch.save({
+            'epoch': epoch,
+            'cnn_state_dict': cnn.state_dict(),
+            'lstm_state_dict': lstm.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': loss
+        }, PATH)
 
         print()
 
@@ -170,8 +168,6 @@ def train_model(model, criterion, optimizer, scheduler, dataloader, num_epochs=2
         time_elapsed // 60, time_elapsed % 60))
     print('Best val Acc: {:4f}'.format(best_acc))
 
-    # load best model weights
-    # model.load_state_dict(best_model_wts)
     return model
 
 if __name__ == '__main__':
