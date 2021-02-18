@@ -27,8 +27,6 @@ UCF-11
 ####UCF-50
 ![plot](./Images/ucf50.png)
 ![plot](./Images/ucf50_1.png)
-
-
 ####UCF-11
 ![plot](./Images/ucf11.png)
 ![plot](./Images/ucf11_1.png)
