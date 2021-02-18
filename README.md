@@ -6,7 +6,7 @@ LSTM takes the input from resnet model for different frames. For simplicity I ha
 
 2 Datasets are used: UCF50, and UCF11, and corresponding branches are colab_ucf50 and colab_ucf11 respectively.
 
-###To run the code (branch colab_ucf50), please do the following steps.
+##To run the code (branch colab_ucf50), please do the following steps.
 
 1, Download the dataset and unzip it
 ! wget 'https://www.crcv.ucf.edu/data/UCF50.rar' --no-check-certificate
